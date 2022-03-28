@@ -10,6 +10,9 @@ function newCellData = extractDataMultiZ(dataDir, fname, meta, opts)
     if ~isfield(opts,'maxCentroidDistance')
         opts.maxCentroidDistance = 5; %um
     end
+    if ~isfield(opts,'Zmethod')
+        opts.Zmethod = 'old';
+    end
     
     if contains(fname,'stitched_p')
         prefix = fname(1:14);
@@ -18,6 +21,12 @@ function newCellData = extractDataMultiZ(dataDir, fname, meta, opts)
         prefix = [s{:}];
     elseif contains(fname,'_Stitched') && contains(fname,'.tif')
         s = strsplit(fname,{'_Stitched','.tif'});
+        prefix = [s{:}];
+    elseif contains(fname,'.tif')
+        s = strsplit(fname,{'.tif'});
+        prefix = [s{:}];
+    elseif contains(fname,'.nd2')
+        s = strsplit(fname,{'.nd2'});
         prefix = [s{:}];
     else
         s = strsplit(fname,'.ims');
@@ -46,7 +55,11 @@ function newCellData = extractDataMultiZ(dataDir, fname, meta, opts)
         imsize = size(mask);
         %binarize and remove the boundaries of objects so they can be
         %identified as connected components
-        nucmask = mask > 0 & ~boundarymask(mask);
+        if ~islogical(mask) %if the mask is a label matrix
+            nucmask = mask > 0 & ~boundarymask(mask);
+        else %if the mask is already binarized
+            nucmask = mask;
+        end
 
         %make cytoplasmic masks
         nucmaskmarg = imdilate(nucmask,strel('disk',opts.cytoMargin));
@@ -143,7 +156,12 @@ function newCellData = extractDataMultiZ(dataDir, fname, meta, opts)
     end
     fprintf('\n')
     
-    [newCellData, chain] = combineZsegmentation(cellData, meta, opts);
+    if strcmp(opts.Zmethod,'old')
+        [newCellData, chain] = combineZsegmentation(cellData, meta, opts);
+    elseif strcmp(opts.Zmethod,'new')
+        [newCellData, chain] = combineZtest2(cellData, meta, opts);
+    end
+    
 
     %make 3D label matrix
     LM = cell(1,1,meta.nZslices);

@@ -19,7 +19,7 @@ function Ilim = micropatternPieVis(dataDir, position, options)
         options.scalebar = true;
     end
     if ~isfield(options,'segOverlay')
-        options.segOverlay = true;
+        options.segOverlay = false;
     end
     if isfield(options,'margin')
         cropmargin = options.margin;

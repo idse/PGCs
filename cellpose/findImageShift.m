@@ -36,7 +36,8 @@ elseif strcmp(alignmentMethod,'manual')
         youtrange = max(1,1-shifty):min(m,m-shifty);
 
         aligned = zeros(mn,'uint16');
-        aligned(xoutrange, youtrange) = I1(xinrange, yinrange);
+%         aligned(xoutrange, youtrange) = I1(xinrange, yinrange);
+        aligned(youtrange, xoutrange) = I1(yinrange, xinrange);
         %update image for new frame
         set(p1,'CData',cat(3,aligned,I2,aligned));
 
@@ -77,6 +78,7 @@ elseif strcmp(alignmentMethod,'manual')
         drawnow limitrate
     end
     close(f)
+    shiftx = -shiftx; shifty = -shifty;
 end
 shiftyx = [shifty shiftx];
 

@@ -8,15 +8,25 @@ cd(dataDir);
 
 manMeta = struct();
 manMeta.nucChannel = 0;
-manMeta.channelLabel = {'DAPI','ISL1','EOMES','SOX17'};
+manMeta.channelLabel = {'DAPI','TFAP2C','SOX17','FOXA2'};
 
-manMeta.conditions = {'ctrl'};
-manMeta.posPerCondition = 5;
+manMeta.conditions = {'24h','42h','48h', '72h', '96h',...
+                        '42h; iwp2>24h','48h; iwp2>24h', '72h; iwp2>24h', '96h; iwp2>24h'};
+manMeta.posPerCondition = 4;
 manMeta.nWells = numel(manMeta.conditions);
 manMeta.nPositions = manMeta.posPerCondition*manMeta.nWells;
 
 filelist = {};
-filelist{1} = dir(fullfile(dataDir,'**/210330_42_HR_ISL1-EOMES-SOX17*FusionStitcher.ims'));
+filelist{1} = dir(fullfile(dataDir,'**/*MP24_AP2C_SOX17_FOXA2_FusionStitcher*.ims'));
+filelist{2} = dir(fullfile(dataDir,'**/*MP42_AP2C_SOX17_FOXA2_FusionStitcher*.ims'));
+filelist{3} = dir(fullfile(dataDir,'**/*MP48_AP2C_SOX17_FOXA2_FusionStitcher*.ims'));
+filelist{4} = dir(fullfile(dataDir,'**/*MP72_AP2C_SOX17_FOXA2_FusionStitcher*.ims'));
+filelist{5} = dir(fullfile(dataDir,'**/*MP96_AP2C_SOX17_FOXA2_FusionStitcher*.ims'));
+
+filelist{6} = dir(fullfile(dataDir,'**/*MP42_AP2C_SOX17_FOXA2_IWP*FusionStitcher*.ims'));
+filelist{7} = dir(fullfile(dataDir,'**/*MP48_AP2C_SOX17_FOXA2_IWP*FusionStitcher*.ims'));
+filelist{8} = dir(fullfile(dataDir,'**/*MP72_AP2C_SOX17_FOXA2_IWP*FusionStitcher*.ims'));
+filelist{9} = dir(fullfile(dataDir,'**/*MP96_AP2C_SOX17_FOXA2_IWP*FusionStitcher*.ims'));
 
 posfile = fullfile(dataDir,['positions' [manMeta.channelLabel{:} '.mat']]);
 if exist(posfile)
@@ -39,14 +49,13 @@ fname = filelist{1}(1).name;
 subdir = filelist{1}(1).folder;
 meta = Metadata(fullfile(subdir,fname), manMeta);
 
-%% extractData
+%%
 opts = struct('cytoSize',4,'cytoMargin',2,'IoU',0.5);
 
 positions(manMeta.nPositions) = Colony();
 
 % for all conditions (aka wells)
-tic
-for ci = 1:manMeta.nWells
+for ci = 1:5%manMeta.nWells
     
     % for all positions belonging to that condition
     for cpi = 1:manMeta.posPerCondition
@@ -55,36 +64,20 @@ for ci = 1:manMeta.nWells
         
         fname = filelist{ci}(cpi).name;
         subdir = filelist{ci}(cpi).folder;
+        disp(fname)
         
         meta = Metadata(fullfile(subdir,fname), manMeta);
         % -1 is only because fusion stitcher attaches a black z-slice at the end
         % may have to be modified later
         meta.nZslices = meta.nZslices - 1;
-        %if there is a stitched 4D tiff with a name matching this one, use
-        %that instead of the FusionStitcher file
-        tifname = strrep(strrep(fname,'FusionStitcher','Stitched'),'.ims','.tif');
-        if exist(fullfile(subdir,tifname),'file') == 2
-            fname = tifname;
-            r = bfGetReader(fullfile(subdir,tifname));
-            %update metadata
-            meta.nZslices = r.getSizeZ(); %don't subtract 1 for stitched tiff stacks
-            meta.xSize = r.getSizeX();
-            meta.ySize = r.getSizeY();
-            fnameformat = meta.filenameFormat;
-            meta.filenameFormat =...
-                strrep(strrep(fnameformat,'FusionStitcher','Stitched'),'.ims','.tif');
-        end
         
         % id ~= pi in this case
         if ~isempty(regexp(fname, '_F[0-9]','Once'))
-            extension = fname(end-3:end);
-            s = strsplit(fname,{'_F',extension});
+            s = strsplit(fname,{'_F','.ims'});
             id = uint16(str2double(s{end-1})) + 1;
         else
             id = pi;
         end
-        fprintf('Position %d\n',pi)
-        disp(fname)
         positions(pi) = Colony(meta, id);
         positions(pi).setRadius(350, meta.xres);
         positions(pi).well = ci;
@@ -96,36 +89,73 @@ for ci = 1:manMeta.nWells
         positions(pi).ncells = size(positions(pi).cellData.XY,1);
     end
 end
-toc
+
 save(posfile, 'positions');
 
 %% make xsections of segmentation
-%save 1 of these per condition
-tic
-for ci = 1:manMeta.nWells
-    cpi = 1;
-    pi = manMeta.posPerCondition*(ci-1) + cpi;
-    fname = positions(pi).filename;
-    prefix = fname(1:end-4);
-    extension = fname(end-3:end);
-    img = readStack(fullfile(dataDir,fname));
+
+% condi = 4;
+% fi = 4;
+% fname = filelist{condi}(fi).name;
+
+%pi = 4; %4, 11, 16, 20
+%count = 0;
+for pi = [4 16]% [20 11 4 16]
     
+    count = count + 1;
+    condi = ceil(pi / meta.posPerCondition);
+    cpi = pi - (condi-1)*meta.posPerCondition;
+    fname = positions(pi).filename;
+
+    s = strsplit(fname,{'.ims'});
+    prefix = [s{:}];
+    img = readStack(fullfile(dataDir,fname));
+
+    opts = struct('cytoSize',4,'cytoMargin',2,'IoU',0.5);
+
+    fname = filelist{condi}(cpi).name;
+    subdir = filelist{condi}(cpi).folder;
+    meta = Metadata(fullfile(subdir,fname), manMeta);
+    %extractDataMultiZ(subdir, fname, meta, opts);
+    meta.nZslices
+    meta.zres
+    meta.nZslices*meta.zres
+
     LMfname = fullfile(dataDir,[prefix '_LabelMatrix3D.mat']);
     LM = load(LMfname);
     LM = LM.LM;
-    
-    s = strsplit(fname, {'_Stitched','_FusionStitcher',extension});
-    meta = load(fullfile(dataDir,[[s{:}] '_zslices'],'meta.mat'));
-    meta = meta.meta;
-    nuclearim = squeeze(img(:,:,nucChannel+1,1:meta.nZslices));
-    %change yinds and xinds if preferred
-    yinds = 1400;
-    xinds = 1:size(img,2);
-    makeCrossSection(nuclearim,LM,meta,yinds,xinds)
-    saveas(gcf, fullfile(dataDir, [prefix  'segmentationXsection_y' num2str(yinds) '.png'])); 
-    close all
+
+    nuclearim = squeeze(img(:,:,1,1:end-1));
+
+
+    % yinds = 1400;
+    % xinds = 1:size(img,2);
+    % makeSegmentationCrossSection(nuclearim,LM,meta,xinds,yinds)
+    % saveas(gcf, fullfile(dataDir, [prefix  'segmentationXsection_y' num2str(yinds) '.png'])); 
+
+    yinds = {1270:1280, 1250:1260};
+    for i = 1:2
+        RGBset = [2 3 4];
+        nucChannel = 1;
+        tol = [0.01 0.99; 0.01 0.98; 0.01 0.99; 0.1 0.99];
+        zcorrection = true;
+        if count == 1
+            disp('setting Ilim');
+            Ilim = makeXsection(img, fname, meta, yinds{i}, RGBset, nucChannel, tol,zcorrection);
+        else
+            makeXsection(img, fname, meta, yinds{i}, RGBset, nucChannel, tol,zcorrection, Ilim);
+        end
+    end
 end
-toc
+
+%%
+yinds = 1270:1280;%1250:1260;
+RGBset = [2 3 4];
+nucChannel = 1;
+tol = [0.01 0.99; 0.01 0.99; 0.01 0.99; 0.1 0.99];
+zcorrection = true;
+makeXsection(img2, fname, meta, yinds, RGBset, nucChannel, tol,zcorrection, Ilim);
+
 
 %% make intensity radial profile
 
@@ -160,17 +190,20 @@ end
 
 %% make distributions out of processed data
 
+meta.nWells = 5;
 stats = cellStats(positions, meta, positions(1).dataChannels(2:end));
 tolerance = 0.01;
 nbins = 50;
+
 stats.makeHistograms(nbins, tolerance);
 confidence = 0.95;
-whichthreshold = [1 1 2];
-conditions = 1:numel(meta.conditions);
-stats.getThresholds(confidence, conditions);%, whichthreshold);
+whichthreshold = [1 1 2 2];
+conditions = 1;%numel(meta.conditions);
+stats.getThresholds(confidence, conditions, whichthreshold);
 %stats.exportCSV(meta); export to CSV
-save(statsfile, 'stats');
+%save(statsfile, 'stats');
 
+%%
 clf
 conditionIdx = 1:numel(meta.conditions);
 for channelIdx = 1:4
@@ -187,24 +220,41 @@ end
 %xlim([0 1000])
 
 %%
-condi = 1;
 i = 2;
 j = 3;
 
-% SAMPLE QC PLOT
-X = stats.nucLevel{condi}(:,i);
-Y = stats.nucLevel{condi}(:,j);
-X = log(1+X/mean(X));
-Y = log(1+Y/mean(Y));
-scatter(X, Y, 2, stats.sample{1})
-
+for condi = 1:numel(meta.conditions)
+    
+    clf
+    
+    % SAMPLE QC PLOT
+    X = stats.nucLevel{condi}(:,i);
+    Y = stats.nucLevel{condi}(:,j);
+    X = log(1+X/mean(X));
+    Y = log(1+Y/mean(Y));
+    scatter(X, Y, 2, stats.sample{condi})
+    xlabel(meta.channelLabel(i))
+    ylabel(meta.channelLabel(j))
+    colorbar
+    
+    if condi == 1
+        xl = xlim;
+        xl(1) = 0;
+        yl = ylim;
+        yl(1) = 0;
+    end
+    xlim(xl);
+    ylim(yl);
+    
+    saveas(gcf, fullfile(dataDir, ['QC_' meta.conditions{condi} '.png'])); 
+end
 
 %% scatter plot subpopulation on image
 figure, 
 
 normIdx = 1;
 pi = 1;
-ci = 3;
+ci = 2;
 
 condi = ceil(pi / meta.posPerCondition);
 cpi = pi - (condi-1)*meta.posPerCondition;
@@ -212,12 +262,11 @@ subDir = filelist{condi}(cpi).folder;
 
 channelThresholds = stats.thresholds;
 
-% s = strsplit(positions(pi).filename,{'_FusionStitcher','.ims'});
-% prefix = [s{:}];
-% 
-% zdir = [prefix '_zslices'];
-% img = imread(fullfile(subDir, zdir, sprintf([prefix '_MIP_w%.4d.tif'], ci-1)));
-img = max(positions(pi).loadImage(dataDir,ci-1,1),[],3);
+s = strsplit(positions(pi).filename,{'_FusionStitcher','.ims'});
+prefix = [s{:}];
+
+zdir = [prefix '_zslices'];
+img = imread(fullfile(subDir, zdir, sprintf([prefix '_MIP_w%.4d.tif'], ci-1)));
 %img = imadjust(img,stitchedlim(img));
 img = mat2gray(img, [150 4000]);
 
@@ -249,26 +298,28 @@ scatter(positions(pi).center(1),positions(pi).center(2),1000,'.','g')
 hold off
 title(meta.channelLabel{ci})
 
-for pi = 1:numel(positions)
-    positions(pi).cellData.channelThresholds = channelThresholds;
-end
-save(fullfile(dataDir,'positions'), 'positions');
 
+%% radial probability of being positive
+
+for condi = 1:numel(meta.conditions)
+    combos = {[2 3]};
+    [P,x] = radialProbability(stats, positions, condi, meta,combos);
+    ylim([0 1]);
+    saveas(gcf, fullfile(dataDir, ['radialprobability_' meta.conditions{condi} '_', meta.channelLabel{2:end} '.png']));
+end
 
 %% radial probability of being positive
 
 Pall = {};
 xall = {};
-channelThresholds = [0 500 500 800];
-stats.thresholds =  channelThresholds;%[0 500 400 700];
-for condi = 1:numel(meta.conditions)
-    combos = {};%[2 4],[2 3],[3 4]};
+for condi = 1:5%numel(meta.conditions)
+    combos = {[2 3],[3 4]};%[2 4],[2 3],[3 4]};
     [P,x,Pstd] = radialPositive(stats, positions, condi, meta,combos);
     Pall{condi} = P;
     Pstdall{condi} = Pstd;
     xall{condi} = x;
     ylim([0 1]);
-    saveas(gcf, fullfile(dataDir, ['radialpositive_' meta.conditions{condi} '_', meta.channelLabel{2:end} '.png']));
+    saveas(gcf, fullfile(dataDir, ['radialpositive2_' meta.conditions{condi} '_', meta.channelLabel{2:end} '.png']));
     close;
 end
 
@@ -277,18 +328,17 @@ end
 combo = [3 2 4];
 %combo = [4 2];
 conditionsidx = 1:5;%6:9;
-combosubset = [1 3];
 counts = countPopulations(positions, meta, stats, dataDir, combo, conditionsidx);
-save(countfile, 'counts');
+%save(countfile, 'counts');
 
 %% make pretty scatter plot
 
 close all;
 options = struct();
-options.conditionIdx = 1%:numel(meta.conditions);
-options.channelCombos = {[3 2]};%, [4 3], [4 2]};
+options.conditionIdx = 1:5;%6:9%:numel(meta.conditions);
+options.channelCombos = {[3 4]};%[3 2], , [4 2]};
 options.channelThresholds = stats.thresholds;
-options.channelMax = exp([3 3 3.5 3])-1;
+options.channelMax = exp([3 3 3.5 2])-1;
 options.log1p = true;
 options.radiusMicron = positions(1).radiusMicron;
 options.conditionsCombined = false;
@@ -303,9 +353,9 @@ options.pieOrder = [3 1 2];
 % tolerances in original order of channels
 % manMeta.channelLabel = {'DAPI','AP2C','NANOG','PRDM1'};
 %manMeta.channelLabel = {'DAPI','AP2C','EOMES','SOX17'};
-options.tol = [0.01 0.99; 0.1 0.99; 0.8 0.99; 0.7 0.995];
+options.tol = [0.01 0.99; 0.7 0.99; 0.1 0.99; 0.7 0.99];
 
-posidx = [6 5 7 8]; % the first position sets the lookup table
+posidx = [17 1:4 9:20];%[9 1 13 17];%[1 5 9 13 17]; %[6 5 7 8]; % the first position sets the lookup table
 
 for pi = posidx
     
@@ -327,12 +377,12 @@ end
 options = struct();
 options.channels = [2 3 4];
 % tolerances in original order of channels
-% manMeta.channelLabel = {'DAPI','AP2C','NANOG','PRDM1'};
-options.tol = [0.01 0.99; 0.1 0.99; 0.01 0.99; 0.7 0.995];
- 
-conditionIdx = [1 2 4 5 6];
+% manMeta.channelLabel = {'DAPI','AP2C','SOX17','FOXA2'};
+options.tol = [0.01 0.99; 0.1 0.99; 0.1 0.99; 0.7 0.9];
+  
+conditionIdx = [1 3 4 5];
 
-options.positionIdx = (conditionIdx-1)*meta.posPerCondition + 1;
+options.positionIdx = (conditionIdx-1)*meta.posPerCondition + 3;
 
 micropatternPieVisConditions(dataDir, positions, options, meta)
 

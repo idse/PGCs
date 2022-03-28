@@ -15,7 +15,7 @@ xoutrange = max(1,1-shiftx):min(m,m-shiftx);
 yinrange = max(1,1+shifty):min(n,n+shifty);
 youtrange = max(1,1-shifty):min(n,n-shifty);
 
-aligned = zeros(size(im1),'uint16');
+aligned = zeros(size(im1),class(im2));
 aligned(xoutrange, youtrange) = im2(xinrange, yinrange);
 
 end

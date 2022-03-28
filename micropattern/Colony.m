@@ -83,8 +83,12 @@ classdef Colony < Position
                 outside = d > this.radiusPixel + margin/xyres;
 
                 fields = fieldnames(this.cellData(ti));
+                fields = fields(cellfun(@(x) ~strcmp(x,'background'),fields));
+                if isempty(this.cellData(ti).cytLevel)
+                    fields = fields(cellfun(@(x) ~strcmp(x,'cytLevel'),fields));
+                end
 
-                for i=1:numel(fields)-1 % - 1 to exclude background which is not for each cell
+                for i=1:numel(fields) % - 1 to exclude background which is not for each cell
                   this.cellData(ti).(fields{i}) = this.cellData(ti).(fields{i})(~outside,:);
                 end
                 
@@ -106,6 +110,8 @@ classdef Colony < Position
             %
             % populates this.radialProfile.AvgSeg where rows correspond to
             % radial bins, and columns to channels
+            
+            warning('this function averages in radial bins that may contain very few points on the edge, leading to artefacts of averages going down on the edge, plotRadialProfiles no longer uses this as input but computes with fixed numbers of points per bin directly from stats');
             
             if ~exist('channels','var') || isempty(channels)
                 channels = 1:numel(this.dataChannels);
@@ -193,7 +199,9 @@ classdef Colony < Position
                         radialProf.NucStdSeg(i,cii) = nanstd(nucbindata);
                         radialProf.nCells(i) = sum(idx);
                         radialProf.NucArea(i) = nanmean(this.cellData(ti).nucArea(idx));
-                        radialProf.CytMaskArea(i) = nanmean(this.cellData(ti).cytMaskArea(idx));
+                        if cyt
+                            radialProf.CytMaskArea(i) = nanmean(this.cellData(ti).cytMaskArea(idx));
+                        end
                     end
                 end
                 this.radialProfile(ti) = radialProf;

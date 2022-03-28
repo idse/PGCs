@@ -24,6 +24,7 @@ function micropatternPieVisConditions(dataDir, positions, options, meta)
         M = numel(options.invisiblePos);
         if M > 0
             invisiblePositions = positions(options.invisiblePos);
+            disp('using invisible positions for contrast');
         end
     else
         M = 0;
@@ -81,9 +82,14 @@ function micropatternPieVisConditions(dataDir, positions, options, meta)
             fname = fullfile(d, subDir, sprintf([prefix '_MIP_w%.4d.tif'], cii-1));
             img = imread(fname);
             lowhigh = stretchlim(img,tol(cii,:));
+            if pi == 1
+                Ilim{cii} = lowhigh; % uncomment this to only use invisible pos
+            end
             Ilim{cii} = [min(Ilim{cii}(1), lowhigh(1)) max(Ilim{cii}(2), lowhigh(2))];
         end
     end
+    
+    Ilim{:}
     
     % adjust contrast, center and crop
     for pi = 1:N

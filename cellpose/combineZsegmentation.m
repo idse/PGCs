@@ -6,7 +6,7 @@ function [newCellData, chain] = combineZsegmentation(cellData, meta, opts)
 IoU = opts.IoU;
 %convert microns to pixels or frames for other options
 maxZslices = floor(opts.maxZsize/meta.zres);
-maxZslices = max([maxZslices,2]);
+maxZslices = max([maxZslices,1]);
 fprintf('Max z slices = %d slices = %g um\n',maxZslices,maxZslices*meta.zres)
 maxCentroidDistance = opts.maxCentroidDistance/meta.xres;
 fprintf('maxCentroidDistance = %g um = %g pixels\n',...
@@ -184,6 +184,7 @@ for jj = 1:nCells
         newCellData.(fields{fi})(jj,:) = cellData(zi).(fields{fi})(ci,:);
     end
     
+    newCellData.nucZ(jj) = zi;
     %collect nuclear level in each channel and z slice for this cell in an
     %array
     nucLevel = zeros(size(cellinfo,1),size(cellData(zi).nucLevel,2));
